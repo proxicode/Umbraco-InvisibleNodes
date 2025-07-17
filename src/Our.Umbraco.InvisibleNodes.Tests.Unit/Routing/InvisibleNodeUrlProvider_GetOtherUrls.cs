@@ -4,6 +4,8 @@
 using System;
 using System.Linq;
 using FluentAssertions;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using Our.Umbraco.InvisibleNodes.Core;
@@ -46,12 +48,20 @@ public class InvisibleNodeUrlProvider_GetOtherUrls
 
         var uri = new Uri("https://example.org/");
 
+        var mockLogger = new Mock<ILogger<InvisibleNodeUrlProvider>>();
+
+        var rulesManager = new Mock<IInvisibleNodeRulesManager>();
+        rulesManager
+            .Setup(m => m.IsInvisibleNode(It.IsAny<IPublishedContent>()))
+            .Returns(false);
+
         var provider = new InvisibleNodeUrlProvider(
             umbracoContextAccessor,
             variationContextAccessor,
             siteDomainMapper,
-            mockRulesManager.Object,
-            RequestHandlerOptions);
+            rulesManager.Object,
+            RequestHandlerOptions,
+            mockLogger.Object);
 
         // Act
         var urls = provider.GetOtherUrls(root.Id, uri);
@@ -84,12 +94,20 @@ public class InvisibleNodeUrlProvider_GetOtherUrls
 
         var uri = new Uri("https://example.org/");
 
+        var mockLogger = new Mock<ILogger<InvisibleNodeUrlProvider>>();
+
+        var rulesManager = new Mock<IInvisibleNodeRulesManager>();
+        rulesManager
+            .Setup(m => m.IsInvisibleNode(It.IsAny<IPublishedContent>()))
+            .Returns(false);
+
         var provider = new InvisibleNodeUrlProvider(
             umbracoContextAccessor,
             variationContextAccessor,
             siteDomainMapper,
-            mockRulesManager.Object,
-            RequestHandlerOptions);
+            rulesManager.Object,
+            RequestHandlerOptions,
+            mockLogger.Object);
 
         // Act
         var urls = provider.GetOtherUrls(root.Id, uri).ToArray();

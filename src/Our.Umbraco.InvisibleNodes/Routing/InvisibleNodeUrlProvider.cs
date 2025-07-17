@@ -4,14 +4,17 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Our.Umbraco.InvisibleNodes.Core;
 using Umbraco.Cms.Core.Configuration.Models;
+using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Models.PublishedContent;
 using Umbraco.Cms.Core.PublishedCache;
 using Umbraco.Cms.Core.Routing;
 using Umbraco.Cms.Core.Web;
 using Umbraco.Extensions;
+using static Umbraco.Cms.Core.Constants.Conventions;
 
 namespace Our.Umbraco.InvisibleNodes.Routing;
 
@@ -22,19 +25,22 @@ public class InvisibleNodeUrlProvider : IUrlProvider
     private readonly ISiteDomainMapper _siteDomainMapper;
     private readonly IInvisibleNodeRulesManager _rulesManager;
     private readonly IOptions<RequestHandlerSettings> _requestHandlerOptions;
+    private readonly ILogger<InvisibleNodeUrlProvider> _logger;
 
     public InvisibleNodeUrlProvider(
         IUmbracoContextAccessor umbracoContextAccessor,
         IVariationContextAccessor variationContextAccessor,
         ISiteDomainMapper siteDomainMapper,
         IInvisibleNodeRulesManager rulesManager,
-        IOptions<RequestHandlerSettings> requestHandlerOptions)
+        IOptions<RequestHandlerSettings> requestHandlerOptions,
+        ILogger<InvisibleNodeUrlProvider> logger)
     {
         _siteDomainMapper = siteDomainMapper;
         _variationContextAccessor = variationContextAccessor;
         _umbracoContextAccessor = umbracoContextAccessor;
         _rulesManager = rulesManager;
         _requestHandlerOptions = requestHandlerOptions;
+        _logger = logger;
     }
 
     /// <inheritdoc />
@@ -45,40 +51,30 @@ public class InvisibleNodeUrlProvider : IUrlProvider
             umbracoContext.Content is null)
             return null;
 
-        // Locate the matching domain for the request
         var domainCache = umbracoContext.Domains;
         string defaultCulture = domainCache.DefaultCulture;
 
-        // Get the matching domain and generated route
         var matchingDomain = GetMatchingDomain(domainCache, content, current, culture);
+        var root = matchingDomain is not null
+            ? umbracoContext.Content.GetById(matchingDomain.ContentId)
+            : umbracoContext.Content.GetAtRoot(culture).FirstOrDefault();
 
-        if (matchingDomain is not null ||
-            string.IsNullOrEmpty(culture) ||
-            Equals(culture, defaultCulture))
+        if (root != null)
         {
-            // Locate the root for the domain
-            var root = matchingDomain is not null
-                ? umbracoContext.Content.GetById(matchingDomain.ContentId)
-                : null;
+            string route = GenerateRoute(content, root, null, true);
+            var baseUri = new Uri(current.GetLeftPart(UriPartial.Authority));
+            var uri = CombineUri(baseUri, route);
 
-            var baseUri = matchingDomain is not null
-                ? matchingDomain.Uri
-                : new Uri(current.GetLeftPart(UriPartial.Authority));
-
-            bool includeNode = matchingDomain is null && content.SortOrder > 0;
-
-            string route = GenerateRoute(content, root, culture, includeNode);
-
-            var combinedUri = CombineUri(baseUri, route);
-
-            if (combinedUri is null)
-                return null;
-
-            return ToUrlInfo(combinedUri, mode, culture, current);
+            if (uri is not null)
+            {
+                return ToUrlInfo(uri, UrlMode.Relative, null, baseUri);
+            }
         }
+
 
         return null;
     }
+
 
     /// <inheritdoc />
     public IEnumerable<UrlInfo> GetOtherUrls(int id, Uri current)
@@ -105,7 +101,8 @@ public class InvisibleNodeUrlProvider : IUrlProvider
             var root = umbracoContext.Content.GetById(mappedDomain.ContentId);
             string? culture = mappedDomain.Culture;
 
-            string route = GenerateRoute(content, root, culture, false);
+            // Fixed: Use true for includeNode to ensure consistent URL generation
+            string route = GenerateRoute(content, root, culture, true);
 
             var uri = CombineUri(mappedDomain.Uri, route);
 
@@ -135,13 +132,24 @@ public class InvisibleNodeUrlProvider : IUrlProvider
         bool includeNode)
     {
         var segments = content.AncestorsOrSelf()
-            .Where(ancestor => IsVisible(ancestor, root, includeNode))
-            .Select(ancestor => ancestor.UrlSegment(_variationContextAccessor, culture))
+            .TakeWhile(n => root == null || n.Id != root.Id)
+            .Where(n =>
+            {
+                bool excludedByRules = n.IsInvisibleNode(_rulesManager);
+                bool shouldIncludeInUrl = IsVisible(n, root, content);
+
+                _logger.LogDebug(
+                    "Node: {Name} (ID: {Id}) - ExcludedByRules: {Excluded} - IncludedInUrl: {Included}",
+                    n.Name, n.Id, excludedByRules, shouldIncludeInUrl);
+
+                return shouldIncludeInUrl;
+            })
+            .Select(n => n.UrlSegment(_variationContextAccessor, culture))
+            .Where(s => !string.IsNullOrWhiteSpace(s))
             .Reverse()
             .ToList();
 
-        return string.Join('/', segments)
-            .EnsureStartsWith("/");
+        return string.Join('/', segments).EnsureStartsWith("/");
     }
 
     /// <summary>
@@ -151,15 +159,15 @@ public class InvisibleNodeUrlProvider : IUrlProvider
     /// <param name="root"></param>
     /// <param name="includeNode"></param>
     /// <returns></returns>
-    private bool IsVisible(
-        IPublishedContent node,
-        IPublishedContent? root,
-        bool includeNode)
+    private bool IsVisible(IPublishedContent node, IPublishedContent? root, IPublishedContent content)
     {
-        int minimumLevel = includeNode ? 0 : 1;
+        if (node == root)
+            return false;
 
-        return !node.IsInvisibleNode(_rulesManager) &&
-               (root is not null ? node.Level > root.Level : node.Level > minimumLevel);
+        if (node.Id == content.Id)
+            return true;
+
+        return !node.IsInvisibleNode(_rulesManager);
     }
 
     /// <summary>
