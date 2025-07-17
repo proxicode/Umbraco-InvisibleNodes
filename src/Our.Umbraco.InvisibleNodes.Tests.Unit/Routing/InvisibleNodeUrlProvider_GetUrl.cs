@@ -1,5 +1,6 @@
 using System;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using Our.Umbraco.InvisibleNodes.Core;
@@ -39,12 +40,15 @@ public class InvisibleNodeUrlProvider_GetUrl
         var root = UmbracoTestHelper.GenerateNode(1, "Home", "home");
         var uri = new Uri("https://example.org/");
 
+        var mockLogger = new Mock<ILogger<InvisibleNodeUrlProvider>>();
+
         var provider = new InvisibleNodeUrlProvider(
             umbracoContextAccessor,
             variationContextAccessor,
             siteDomainMapper,
             rulesManager.Object,
-            RequestHandlerOptions);
+            RequestHandlerOptions,
+            mockLogger.Object);
 
         // Act
         var url = provider.GetUrl(root, UrlMode.Default, null, uri);
@@ -75,12 +79,15 @@ public class InvisibleNodeUrlProvider_GetUrl
 
         var uri = new Uri("https://example.org/");
 
+        var mockLogger = new Mock<ILogger<InvisibleNodeUrlProvider>>();
+
         var provider = new InvisibleNodeUrlProvider(
             umbracoContextAccessor,
             variationContextAccessor,
             siteDomainMapper,
             rulesManager.Object,
-            RequestHandlerOptions);
+            RequestHandlerOptions,
+            mockLogger.Object);
 
         // Act
         var url = provider.GetUrl(page, UrlMode.Default, null, uri);
@@ -112,12 +119,15 @@ public class InvisibleNodeUrlProvider_GetUrl
 
         var uri = new Uri("https://example.org/");
 
+        var mockLogger = new Mock<ILogger<InvisibleNodeUrlProvider>>();
+
         var provider = new InvisibleNodeUrlProvider(
             umbracoContextAccessor,
             variationContextAccessor,
             siteDomainMapper,
             rulesManager.Object,
-            RequestHandlerOptions);
+            RequestHandlerOptions,
+            mockLogger.Object);
 
         // Act
         var url = provider.GetUrl(nested, UrlMode.Default, null, uri);
@@ -149,12 +159,15 @@ public class InvisibleNodeUrlProvider_GetUrl
 
         var uri = new Uri("https://example.org/");
 
+        var mockLogger = new Mock<ILogger<InvisibleNodeUrlProvider>>();
+
         var provider = new InvisibleNodeUrlProvider(
             umbracoContextAccessor,
             variationContextAccessor,
             siteDomainMapper,
             rulesManager.Object,
-            RequestHandlerOptions);
+            RequestHandlerOptions,
+            mockLogger.Object);
 
         // Act
         var url = provider.GetUrl(nested, UrlMode.Default, null, uri);
@@ -190,12 +203,15 @@ public class InvisibleNodeUrlProvider_GetUrl
 
         var uri = new Uri("https://example.org/");
 
+        var mockLogger = new Mock<ILogger<InvisibleNodeUrlProvider>>();
+
         var provider = new InvisibleNodeUrlProvider(
             umbracoContextAccessor,
             variationContextAccessor,
             siteDomainMapper,
             rulesManager.Object,
-            RequestHandlerOptions);
+            RequestHandlerOptions,
+            mockLogger.Object);
 
         // Act
         var url = provider.GetUrl(invisible, UrlMode.Default, null, uri);
@@ -232,12 +248,15 @@ public class InvisibleNodeUrlProvider_GetUrl
 
         var uri = new Uri("https://example.org/");
 
+        var mockLogger = new Mock<ILogger<InvisibleNodeUrlProvider>>();
+
         var provider = new InvisibleNodeUrlProvider(
             umbracoContextAccessor,
             variationContextAccessor,
             siteDomainMapper,
             rulesManager.Object,
-            RequestHandlerOptions);
+            RequestHandlerOptions,
+            mockLogger.Object);
 
         // Act
         var url = provider.GetUrl(hidden, UrlMode.Default, null, uri);
@@ -272,12 +291,15 @@ public class InvisibleNodeUrlProvider_GetUrl
         var root = UmbracoTestHelper.GenerateNode(1, "Home", "home");
         var uri = new Uri("https://example.org/");
 
+        var mockLogger = new Mock<ILogger<InvisibleNodeUrlProvider>>();
+
         var provider = new InvisibleNodeUrlProvider(
             umbracoContextAccessor,
             variationContextAccessor,
             siteDomainMapper,
             rulesManager.Object,
-            RequestHandlerOptions);
+            RequestHandlerOptions,
+            mockLogger.Object);
 
         // Act
         var url = provider.GetUrl(root, UrlMode.Absolute, null, uri);
@@ -310,12 +332,15 @@ public class InvisibleNodeUrlProvider_GetUrl
 
         var uri = new Uri("https://example.org/");
 
+        var mockLogger = new Mock<ILogger<InvisibleNodeUrlProvider>>();
+
         var provider = new InvisibleNodeUrlProvider(
             umbracoContextAccessor,
             variationContextAccessor,
             siteDomainMapper,
             rulesManager.Object,
-            RequestHandlerOptions);
+            RequestHandlerOptions,
+            mockLogger.Object);
 
         // Act
         var url = provider.GetUrl(page, UrlMode.Absolute, null, uri);
@@ -349,12 +374,15 @@ public class InvisibleNodeUrlProvider_GetUrl
 
         var uri = new Uri("https://example.org/");
 
+        var mockLogger = new Mock<ILogger<InvisibleNodeUrlProvider>>();
+
         var provider = new InvisibleNodeUrlProvider(
             umbracoContextAccessor,
             variationContextAccessor,
             siteDomainMapper,
             rulesManager.Object,
-            RequestHandlerOptions);
+            RequestHandlerOptions,
+            mockLogger.Object);
 
         // Act
         var url = provider.GetUrl(nested, UrlMode.Absolute, null, uri);
@@ -392,12 +420,15 @@ public class InvisibleNodeUrlProvider_GetUrl
 
         var uri = new Uri("https://example.org/");
 
+        var mockLogger = new Mock<ILogger<InvisibleNodeUrlProvider>>();
+
         var provider = new InvisibleNodeUrlProvider(
             umbracoContextAccessor,
             variationContextAccessor,
             siteDomainMapper,
             rulesManager.Object,
-            RequestHandlerOptions);
+            RequestHandlerOptions,
+            mockLogger.Object);
 
         // Act
         var url = provider.GetUrl(invisible, UrlMode.Absolute, null, uri);
@@ -436,12 +467,15 @@ public class InvisibleNodeUrlProvider_GetUrl
 
         var uri = new Uri("https://example.org/");
 
+        var mockLogger = new Mock<ILogger<InvisibleNodeUrlProvider>>();
+
         var provider = new InvisibleNodeUrlProvider(
             umbracoContextAccessor,
             variationContextAccessor,
             siteDomainMapper,
             rulesManager.Object,
-            RequestHandlerOptions);
+            RequestHandlerOptions,
+            mockLogger.Object);
 
         // Act
         var url = provider.GetUrl(hidden, UrlMode.Absolute, null, uri);

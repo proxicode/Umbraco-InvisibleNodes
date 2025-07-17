@@ -1,71 +1,84 @@
-// Copyright 2023 Luke Fisher
-// SPDX-License-Identifier: Apache-2.0
-
-using System;
-using System.Linq;
-using System.Threading.Tasks;
-using Our.Umbraco.InvisibleNodes.Core;
+using Microsoft.Extensions.Logging;
 using Our.Umbraco.InvisibleNodes.Core.Caching;
+using Our.Umbraco.InvisibleNodes.Core;
+using System.Threading.Tasks;
+using System;
 using Umbraco.Cms.Core.Routing;
 using Umbraco.Cms.Core.Web;
-
-namespace Our.Umbraco.InvisibleNodes.Routing;
+using System.Linq;
 
 public class InvisibleNodeContentFinder : IContentFinder
 {
-    private readonly IUmbracoContextAccessor _umbracoContextAccessor;
-    private readonly IInvisibleNodeCache _invisibleNodeCache;
-    private readonly IInvisibleNodeLocator _invisibleNodeLocator;
+    private readonly IUmbracoContextAccessor _uContextAccessor;
+    private readonly IInvisibleNodeCache _cache;
+    private readonly IInvisibleNodeLocator _locator;
+    private readonly ILogger<InvisibleNodeContentFinder> _logger;
 
     public InvisibleNodeContentFinder(
-        IUmbracoContextAccessor umbracoContextAccessor,
-        IInvisibleNodeCache invisibleNodeCache,
-        IInvisibleNodeLocator invisibleNodeLocator)
+        IUmbracoContextAccessor uContextAccessor,
+        IInvisibleNodeCache cache,
+        IInvisibleNodeLocator locator,
+        ILogger<InvisibleNodeContentFinder> logger)
     {
-        _umbracoContextAccessor = umbracoContextAccessor;
-        _invisibleNodeCache = invisibleNodeCache;
-        _invisibleNodeLocator = invisibleNodeLocator;
+        _uContextAccessor = uContextAccessor;
+        _cache = cache;
+        _locator = locator;
+        _logger = logger;
     }
 
-    /// <inheritdoc />
     public Task<bool> TryFindContent(IPublishedRequestBuilder request)
     {
-        if (!_umbracoContextAccessor.TryGetUmbracoContext(out var context) || context.Content is null)
-            return Task.FromResult(false);
-
-        string host = request.Uri.GetLeftPart(UriPartial.Authority);
-        string path = request.Uri.AbsolutePath;
-
-        int? cached = _invisibleNodeCache.GetRoute(host, path);
-
-        if (cached.HasValue)
+        if (!_uContextAccessor.TryGetUmbracoContext(out var ctx))
         {
-            var cachedContent = context.Content.GetById(cached.Value);
+            _logger.LogWarning("No UmbracoContext available");
+            return Task.FromResult(false);
+        }
 
-            if (cachedContent is not null)
+        var contentCache = ctx.Content;
+        var uri = request.Uri;
+        var host = uri.GetLeftPart(UriPartial.Authority);
+        var path = uri.AbsolutePath;
+
+        if (path == "/" || string.IsNullOrWhiteSpace(path))
+        {
+            var homeNode = contentCache.GetAtRoot(request.Culture).FirstOrDefault();
+            if (homeNode is not null)
             {
-                request.SetPublishedContent(cachedContent);
+                request.SetPublishedContent(homeNode);
                 return Task.FromResult(true);
             }
-            
-            _invisibleNodeCache.ClearRoute(host, path);
+
+            return Task.FromResult(false);
         }
-        
-        string? culture = request.Culture;
+
+        _logger.LogDebug("Routing {Host}{Path}", host, path);
+
+        if (_cache.GetRoute(host, path) is int cachedId)
+        {
+            var cached = contentCache.GetById(cachedId);
+            if (cached != null)
+            {
+                request.SetPublishedContent(cached);
+                return Task.FromResult(true);
+            }
+            _cache.ClearRoute(host, path);
+        }
 
         var root = request.Domain is not null
-            ? context.Content.GetById(request.Domain.ContentId)
-            : context.Content.GetAtRoot(culture).FirstOrDefault();
+            ? contentCache.GetById(request.Domain.ContentId)
+            : contentCache.GetAtRoot(request.Culture).FirstOrDefault();
 
-        if (root is null)
-            return Task.FromResult(false);
-        
-        var foundNode = _invisibleNodeLocator.Locate(root, path, culture);
-
-        if (foundNode is not null)
+        if (root == null)
         {
-            _invisibleNodeCache.StoreRoute(host, path, foundNode.Id);
-            request.SetPublishedContent(foundNode);
+            _logger.LogWarning("No root node found");
+            return Task.FromResult(false);
+        }
+
+        var found = _locator.Locate(root, path, request.Culture);
+        if (found != null)
+        {
+            _cache.StoreRoute(host, path, found.Id);
+            request.SetPublishedContent(found);
             return Task.FromResult(true);
         }
 

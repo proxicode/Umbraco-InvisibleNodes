@@ -1,17 +1,15 @@
-// Copyright 2023 Luke Fisher
-// SPDX-License-Identifier: Apache-2.0
-
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
-using Our.Umbraco.InvisibleNodes.Caching;
-using Our.Umbraco.InvisibleNodes.Core;
-using Our.Umbraco.InvisibleNodes.Core.Caching;
-using Our.Umbraco.InvisibleNodes.Notifications;
-using Our.Umbraco.InvisibleNodes.Routing;
-using Umbraco.Cms.Core.Cache;
 using Umbraco.Cms.Core.Composing;
 using Umbraco.Cms.Core.DependencyInjection;
+using Our.Umbraco.InvisibleNodes.Routing;
+using Our.Umbraco.InvisibleNodes.Core;
+using Our.Umbraco.InvisibleNodes.Core.Caching;
+using Microsoft.Extensions.Options;
+using Umbraco.Cms.Core.Cache;
 using Umbraco.Cms.Core.Notifications;
+using Microsoft.Extensions.DependencyInjection;
+using Our.Umbraco.InvisibleNodes.Notifications;
+using Our.Umbraco.InvisibleNodes.Caching;
+using Umbraco.Cms.Core.Routing;
 
 namespace Our.Umbraco.InvisibleNodes.Composing;
 
@@ -19,15 +17,24 @@ public class PackageComposer : IComposer
 {
     public void Compose(IUmbracoBuilder builder)
     {
+        // Register your content finder BEFORE the default one
         builder.ContentFinders()
-            .Insert<InvisibleNodeContentFinder>();
+            .InsertBefore<ContentFinderByUrlNew, InvisibleNodeContentFinder>();
+
+        // Optional: Remove Umbraco's default one if yours should override completely
+        builder.ContentFinders()
+            .Remove<ContentFinderByUrlNew>();
 
         builder.UrlProviders()
+            .Remove<DefaultUrlProvider>()
             .Insert<InvisibleNodeUrlProvider>();
+
+        builder.UrlSegmentProviders()
+            .Insert<InvisibleNodeUrlSegmentProvider>(0); // make sure it's first
 
         builder.Services
             .Configure<InvisibleNodeSettings>(builder.Config.GetSection(InvisibleNodeSettings.InvisibleNodes));
-        
+
         builder.Services
             .AddSingleton<IInvisibleNodeLocator, InvisibleNodeLocator>()
             .AddSingleton<IInvisibleNodeRulesManager, InvisibleNodeRulesManager>();
@@ -36,11 +43,9 @@ public class PackageComposer : IComposer
             .AddSingleton<IInvisibleNodeCache>(provider =>
             {
                 var settings = provider.GetRequiredService<IOptions<InvisibleNodeSettings>>();
-               
-                if (settings.Value.CachingEnabled)
-                    return new InvisibleNodeCache(provider.GetRequiredService<AppCaches>());
-
-                return new NoOpNodeCache();
+                return settings.Value.CachingEnabled
+                    ? new InvisibleNodeCache(provider.GetRequiredService<AppCaches>())
+                    : new NoOpNodeCache();
             });
 
         builder
